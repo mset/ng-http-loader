@@ -13,7 +13,7 @@ import { Spinkit } from '../../spinkits';
 import { PendingInterceptorService } from '../../services/pending-interceptor.service';
 import { timer } from 'rxjs/observable/timer';
 import { Observable } from 'rxjs/Observable';
-import { debounce } from 'rxjs/operators';
+import { debounce, merge } from 'rxjs/operators';
 import { SpinnerVisibilityService } from '../../services/spinner-visibility.service';
 
 @Component({
@@ -22,7 +22,7 @@ import { SpinnerVisibilityService } from '../../services/spinner-visibility.serv
     styleUrls: ['./spinner.component.css']
 })
 export class SpinnerComponent implements OnDestroy, OnInit {
-    public isSpinnerVisible: boolean;
+    public isSpinnerVisible$: Observable<boolean>;
     private pendingSubscription: Subscription;
     private visibilitySubscription: Subscription;
 
@@ -39,14 +39,13 @@ export class SpinnerComponent implements OnDestroy, OnInit {
     public entryComponent: any = null;
 
     constructor(private pendingInterceptorService: PendingInterceptorService, private spinnerVisibilityService: SpinnerVisibilityService) {
-        this.pendingSubscription = this.pendingInterceptorService
+        this.isSpinnerVisible$ = this.pendingInterceptorService
             .pendingRequestsStatus
-            .pipe(debounce(this.handleDebounce.bind(this)))
-            .subscribe(this.handleSpinnerVisibility().bind(this));
-
-        this.visibilitySubscription = this.spinnerVisibilityService
-            .visibilityObservable
-            .subscribe(this.handleSpinnerVisibility().bind(this));
+            .pipe(
+                debounce(this.handleDebounce.bind(this)),
+                merge(this.spinnerVisibilityService
+                    .visibilityObservable)
+            );
     }
 
     ngOnInit(): void {
@@ -72,10 +71,6 @@ export class SpinnerComponent implements OnDestroy, OnInit {
         if (null != this.entryComponent) {
             this.spinner = null;
         }
-    }
-
-    private handleSpinnerVisibility(): (v: boolean) => void {
-        return v => this.isSpinnerVisible = v;
     }
 
     private handleDebounce(hasPendingRequests: boolean): Observable<number> {
