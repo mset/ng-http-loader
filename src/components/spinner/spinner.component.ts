@@ -7,24 +7,20 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
-import { Subscription } from 'rxjs/Subscription';
+import { Component, Input, OnInit, NgZone } from '@angular/core';
 import { Spinkit } from '../../spinkits';
 import { PendingInterceptorService } from '../../services/pending-interceptor.service';
-import { timer } from 'rxjs/observable/timer';
-import { Observable } from 'rxjs/Observable';
-import { debounce, merge } from 'rxjs/operators';
 import { SpinnerVisibilityService } from '../../services/spinner-visibility.service';
+import { Observable } from 'rxjs/Observable';
+import { debounceTime, merge, tap } from 'rxjs/operators';
 
 @Component({
     selector: 'spinner',
     templateUrl: './spinner.component.html',
     styleUrls: ['./spinner.component.css']
 })
-export class SpinnerComponent implements OnDestroy, OnInit {
+export class SpinnerComponent implements OnInit {
     public isSpinnerVisible$: Observable<boolean>;
-    private pendingSubscription: Subscription;
-    private visibilitySubscription: Subscription;
 
     public Spinkit = Spinkit;
     @Input()
@@ -38,14 +34,17 @@ export class SpinnerComponent implements OnDestroy, OnInit {
     @Input()
     public entryComponent: any = null;
 
-    constructor(private pendingInterceptorService: PendingInterceptorService, private spinnerVisibilityService: SpinnerVisibilityService) {
+    constructor(
+        private pendingInterceptorService: PendingInterceptorService,
+        private spinnerVisibilityService: SpinnerVisibilityService
+    ) {
         this.isSpinnerVisible$ = this.pendingInterceptorService
             .pendingRequestsStatus
             .pipe(
-                debounce(this.handleDebounce.bind(this)),
                 merge(this.spinnerVisibilityService
-                    .visibilityObservable)
-            );
+                    .visibilityObservable),
+                debounceTime(this.debounceDelay),
+        );
     }
 
     ngOnInit(): void {
@@ -62,22 +61,10 @@ export class SpinnerComponent implements OnDestroy, OnInit {
         }
     }
 
-    ngOnDestroy(): void {
-        this.pendingSubscription.unsubscribe();
-        this.visibilitySubscription.unsubscribe();
-    }
-
     private nullifySpinnerIfComponentOutletIsDefined(): void {
         if (null != this.entryComponent) {
             this.spinner = null;
         }
     }
 
-    private handleDebounce(hasPendingRequests: boolean): Observable<number> {
-        if (hasPendingRequests) {
-            return timer(this.debounceDelay);
-        }
-
-        return timer(0);
-    }
 }
